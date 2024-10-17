@@ -11,6 +11,23 @@ app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+    const token = req.cookies.token;
+    if (!token) {
+        return res.status(403).send({ message: 'Access denied. No token provided.' });
+    }
+    if (token) {
+        jwt.verify(token, process.env.JWT_TOKEN, (error, decoded) => {
+            if (error) {
+                return res.status(403).send({ message: 'Access denied. Invalid token.' });
+            }
+            req.user = decoded;
+            next();
+        })
+    }
+}
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mmutbdd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -31,6 +48,25 @@ async function run() {
 
         app.get('/', (req, res) => {
             res.send('Hello from DropMate!')
+        })
+
+        app.post('/jwt',async(req,res)=>{
+            const user = req.body;
+            const token = jwt.sign(user, process.env.JWT_TOKEN,{expiresIn: '7d'})
+            res.cookie('token',token,{
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+            })
+        })
+
+        app.get('/remove_token',async(req,res)=>{
+            res.clearCookie('token',{
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+                maxAge: 0
+            }).send({message: 'Token Removed'})
         })
 
 
