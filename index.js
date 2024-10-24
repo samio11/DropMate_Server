@@ -2,12 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, Timestamp } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+
+const corsConfig = {
+    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    credentials: true,
+    optionsSuccessStatus: 200,
+}
+
+app.use(cors(corsConfig));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -46,28 +53,52 @@ async function run() {
         // await client.connect();
         // Send a ping to confirm a successful connection
 
+        const userCollection = client.db('DropMate').collection('Users')
+
         app.get('/', (req, res) => {
             res.send('Hello from DropMate!')
         })
 
-        app.post('/jwt',async(req,res)=>{
+        app.post('/jwt', async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.JWT_TOKEN,{expiresIn: '7d'})
-            res.cookie('token',token,{
+            const token = jwt.sign(user, process.env.JWT_TOKEN, { expiresIn: '7d' })
+            res.cookie('token', token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
-            })
+            }).send({message: 'Token Set Done'})
         })
 
-        app.get('/remove_token',async(req,res)=>{
-            res.clearCookie('token',{
+        app.get('/remove_token', async (req, res) => {
+            res.clearCookie('token', {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
                 maxAge: 0
-            }).send({message: 'Token Removed'})
+            }).send({ message: 'Token Removed' })
         })
+
+        // if new user come add to DB,if older user come return user is already exists
+        app.put('/user',async(req,res)=>{
+            const user = req.body;
+            console.log(user)
+            const isExist = await userCollection.findOne({email:user.email})
+            if(isExist) return res.status(401).send({message:'User already registered'})
+            const query = {email:user?.email || ''}
+            const options = {upsert: true}
+            const updateDoc = {
+                $set:{
+                    ...user,
+                    Timestamp: Date.now()
+                }
+            }
+            const result = await userCollection.updateOne(query, updateDoc, options)
+            res.send(result)
+
+        })
+
+
+
 
 
 
