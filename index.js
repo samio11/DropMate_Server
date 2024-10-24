@@ -81,7 +81,6 @@ async function run() {
         // if new user come add to DB,if older user come return user is already exists
         app.put('/user',async(req,res)=>{
             const user = req.body;
-            console.log(user)
             const isExist = await userCollection.findOne({email:user.email})
             if(isExist) return res.status(401).send({message:'User already registered'})
             const query = {email:user?.email || ''}
@@ -95,6 +94,15 @@ async function run() {
             const result = await userCollection.updateOne(query, updateDoc, options)
             res.send(result)
 
+        })
+
+        //Loading user Role
+        app.get('/user/:email',async(req,res)=>{
+            const email = req.params.email;
+            console.log(email)
+            const user = await userCollection.findOne({email})
+            if(!user) return res.status(404).send({message:'User not found'})
+            res.send(user)
         })
 
 
