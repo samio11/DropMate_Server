@@ -6,6 +6,7 @@ const { MongoClient, ServerApiVersion, Timestamp, ObjectId } = require('mongodb'
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.PAYMENT_SECRET);
 
 
 const corsConfig = {
@@ -153,13 +154,13 @@ async function run() {
         //Update User Parcel
         app.put('/update_parcel', verifyToken, verifyUser, async (req, res) => {
             const parcel = req.body;
-            const { _id, ...updateData } = parcel; 
+            const { _id, ...updateData } = parcel;
 
             if (!_id) {
                 return res.status(400).send({ message: "Parcel ID is required" });
             }
 
-            const query = { _id: new ObjectId(_id) }; 
+            const query = { _id: new ObjectId(_id) };
             const updateDoc = {
                 $set: updateData
             };
@@ -179,8 +180,32 @@ async function run() {
             const query = { _id: new ObjectId(id) };
             const result = await bookingCollection.deleteOne(query);
             res.send(result);
-            
+
         });
+
+        //For Stripe Payment
+        app.post("/create-payment-intent", async (req, res) => {
+            const { price } = req.body;
+            const amount = parseInt(price * 100);
+
+            try {
+                // Create a PaymentIntent with the order amount and currency
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: amount,
+                    currency: "usd",
+                    payment_method_types: ['card'] // corrected parameter name
+                });
+
+                res.send({
+                    clientSecret: paymentIntent.client_secret,
+                });
+            } catch (error) {
+                console.error("Error creating PaymentIntent:", error);
+                res.status(500).send({ error: error.message });
+            }
+        });
+
+
 
 
 
